@@ -1,85 +1,44 @@
 pipeline {
     agent any
 
+    environment {
+        APP_NAME = "branch-based-app"
+        APP_PORT = "8085"
+    }
+
     stages {
 
         stage('Checkout') {
             steps {
-                echo "Checking out source code"
                 checkout scm
             }
         }
 
         stage('Install & Test') {
             steps {
-                echo "Installing dependencies and running tests"
-
-                script {
-                    if (isUnix()) {
-                        sh '''
-                          python --version
-                          pip install -r requirements.txt
-                        '''
-                    } else {
-                        bat '''
-                          python --version
-                          pip install -r requirements.txt
-                        '''
-                    }
-                }
+                bat '''
+                python --version
+                pip install -r requirements.txt
+                '''
             }
         }
 
         stage('Docker Build') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'develop'
-                }
-            }
             steps {
-                echo "Building Docker image"
-
-                script {
-                    if (isUnix()) {
-                        sh 'docker build -t branch-based-app:latest .'
-                    } else {
-                        bat 'docker build -t branch-based-app:latest .'
-                    }
-                }
+                bat '''
+                docker build -t %APP_NAME%:latest .
+                '''
             }
         }
 
         stage('Deploy') {
-            when {
-                branch 'main'
-            }
             steps {
-                echo "Deploying application"
-
-                script {
-                    if (isUnix()) {
-                        sh '''
-                          docker rm -f branch-app || true
-                          docker run -d -p 8085:8080 --name branch-app branch-based-app:latest
-                        '''
-                    } else {
-                        bat '''
-                          docker rm -f branch-app
-                          docker run -d -p 8085:8080 --name branch-app branch-based-app:latest
-                        '''
-                    }
-                }
+                bat '''
+                docker stop %APP_NAME% || exit 0
+                docker rm %APP_NAME% || exit 0
+                docker run -d -p %APP_PORT%:8080 --name %APP_NAME% %APP_NAME%:latest
+                '''
             }
-        }
-    }
-
-    post {
-        success {
-            echo "Pipeline completed successfully"
-        }
-        failure {
-            echo "Pipeline failed – check logs"
         }
     }
 }
