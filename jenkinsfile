@@ -2,7 +2,8 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = "branch-based-app"
+        IMAGE_NAME = "branch-ci-app"
+        CONTAINER_NAME = "branch-ci-app-container"
         APP_PORT = "8085"
     }
 
@@ -14,31 +15,30 @@ pipeline {
             }
         }
 
-        stage('Install & Test') {
-            steps {
-                bat '''
-                python --version
-                pip install -r requirements.txt
-                '''
-            }
-        }
-
         stage('Docker Build') {
             steps {
-                bat '''
-                docker build -t %APP_NAME%:latest .
-                '''
+                bat """
+                docker build -t %IMAGE_NAME% .
+                """
             }
         }
 
         stage('Deploy') {
             steps {
-                bat '''
-                docker stop %APP_NAME% || exit 0
-                docker rm %APP_NAME% || exit 0
-                docker run -d -p %APP_PORT%:8080 --name %APP_NAME% %APP_NAME%:latest
-                '''
+                bat """
+                docker rm -f %CONTAINER_NAME% || exit 0
+                docker run -d -p %APP_PORT%:8080 --name %CONTAINER_NAME% %IMAGE_NAME%
+                """
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Application deployed successfully 🚀"
+        }
+        failure {
+            echo "Pipeline failed ❌"
         }
     }
 }
