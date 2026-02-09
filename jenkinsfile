@@ -1,0 +1,44 @@
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git branch: env.BRANCH_NAME,
+                    url: 'https://github.com/Rajesh-770/branch-based-ci-cd.git'
+            }
+        }
+
+        stage('Install & Test') {
+            steps {
+                sh 'pip install flask'
+                sh 'pytest || true'
+            }
+        }
+
+        stage('Docker Build') {
+            when {
+                anyOf {
+                    branch 'develop'
+                    branch 'main'
+                }
+            }
+            steps {
+                sh 'docker build -t branch-app:${BUILD_NUMBER} .'
+            }
+        }
+
+        stage('Deploy') {
+            when {
+                branch 'main'
+            }
+            steps {
+                sh '''
+                docker rm -f branch-app || true
+                docker run -d -p 8085:8080 --name branch-app branch-app:${BUILD_NUMBER}
+                '''
+            }
+        }
+    }
+}
