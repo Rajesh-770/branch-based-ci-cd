@@ -5,27 +5,48 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git branch: env.BRANCH_NAME,
-                    url: 'https://github.com/Rajesh-770/branch-based-ci-cd.git'
+                echo "Checking out source code"
+                checkout scm
             }
         }
 
         stage('Install & Test') {
             steps {
-                sh 'pip install flask'
-                sh 'pytest || true'
+                echo "Installing dependencies and running tests"
+
+                script {
+                    if (isUnix()) {
+                        sh '''
+                          python --version
+                          pip install -r requirements.txt
+                        '''
+                    } else {
+                        bat '''
+                          python --version
+                          pip install -r requirements.txt
+                        '''
+                    }
+                }
             }
         }
 
         stage('Docker Build') {
             when {
                 anyOf {
-                    branch 'develop'
                     branch 'main'
+                    branch 'develop'
                 }
             }
             steps {
-                sh 'docker build -t branch-app:${BUILD_NUMBER} .'
+                echo "Building Docker image"
+
+                script {
+                    if (isUnix()) {
+                        sh 'docker build -t branch-based-app:latest .'
+                    } else {
+                        bat 'docker build -t branch-based-app:latest .'
+                    }
+                }
             }
         }
 
@@ -34,11 +55,31 @@ pipeline {
                 branch 'main'
             }
             steps {
-                sh '''
-                docker rm -f branch-app || true
-                docker run -d -p 8085:8080 --name branch-app branch-app:${BUILD_NUMBER}
-                '''
+                echo "Deploying application"
+
+                script {
+                    if (isUnix()) {
+                        sh '''
+                          docker rm -f branch-app || true
+                          docker run -d -p 8085:8080 --name branch-app branch-based-app:latest
+                        '''
+                    } else {
+                        bat '''
+                          docker rm -f branch-app
+                          docker run -d -p 8085:8080 --name branch-app branch-based-app:latest
+                        '''
+                    }
+                }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Pipeline completed successfully"
+        }
+        failure {
+            echo "Pipeline failed – check logs"
         }
     }
 }
